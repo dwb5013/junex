@@ -1,6 +1,6 @@
 # junex
 
-A minimal `uv` project scaffold for batch jobs that call external APIs, aggregate data, compute metrics, and write results to a database.
+A `uv`-managed data pipeline that uses the official J-Quants Python client, keeps datasets as pandas DataFrames, and persists them into a local DuckDB database for OLAP.
 
 ## Requirements
 
@@ -15,26 +15,17 @@ uv sync --dev
 
 ## Stack
 
-- `alembic` for schema migrations
+- `duckdb` for local analytical storage
 - `httpx` for outbound API calls
+- `jquants-api-client` for the official J-Quants v2 client
+- `pandas` for DataFrame transforms and statistics
 - `pydantic` for internal data models
 - `pydantic-settings` for config via env and `.env`
-- `psycopg` for PostgreSQL driver support
-- `sqlalchemy` for database access
-- `pandas` for aggregation and statistics
 - `structlog` for structured logs
 
 ## Run
 
 ```bash
-uv run junex
-```
-
-If you want a local PostgreSQL with Docker:
-
-```bash
-docker compose up -d db
-uv run alembic upgrade head
 uv run junex
 ```
 
@@ -44,9 +35,9 @@ The current scaffold does this:
 - normalize response data
 - merge records
 - compute summary stats
-- write summary data into a database
+- write summary data into DuckDB
 - print JSON output
-- sync J-Quants `/v2/equities/master` into PostgreSQL when `JQUANTS_API_KEY` is configured
+- sync J-Quants datasets into DuckDB when `JQUANTS_API_KEY` is configured
 
 ## Test
 
@@ -59,9 +50,9 @@ uv run pytest
 ```text
 app/
   cli.py         # batch entrypoint
-  clients.py     # outbound API clients
+  clients.py     # external HTTP client + official J-Quants wrapper
   config.py      # settings from env/.env
-  db.py          # database access
+  db.py          # DuckDB persistence helpers
   jobs.py        # batch job orchestration
   logging.py     # structured logging
   aggregator.py  # merge and aggregation logic
@@ -73,21 +64,24 @@ app/
 
 Environment variables supported by default:
 
-- `DATABASE_URL`
+- `DUCKDB_PATH`
 - `API_BASE_URL`
 - `API_TIMEOUT_SECONDS`
 - `DATASET_A_PATH`
 - `DATASET_B_PATH`
-- `JQUANTS_API_BASE_URL`
 - `JQUANTS_API_KEY`
-- `JQUANTS_TIMEOUT_SECONDS`
 - `LOG_LEVEL`
 
-Copy `.env.example` to `.env` for local development and put your real credentials only in `.env`.
-The project ignores `.env`, so your secrets will not be committed as long as you do not paste them into tracked files.
-
-## Migrations
+Example:
 
 ```bash
-uv run alembic upgrade head
+export JQUANTS_API_KEY=your_api_key
+export DUCKDB_PATH=var/junex.duckdb
+uv run junex sync-margin-interest --code 7203 --from-date 2024-01-01 --to-date 2024-03-31
+```
+
+Then inspect the stored data with DuckDB:
+
+```bash
+duckdb "$DUCKDB_PATH" 'select * from market_data.margin_interest limit 5;'
 ```

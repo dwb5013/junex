@@ -12,6 +12,7 @@ from app.jobs import (
     sync_equity_master,
     sync_fins_dividend,
     sync_index_daily_bars,
+    sync_margin_interest,
 )
 from app.logging import configure_logging
 
@@ -43,6 +44,18 @@ def main() -> None:
         result = {
             "upserted": asyncio.run(
                 sync_fins_dividend(
+                    settings,
+                    code=args.code,
+                    date=args.date,
+                    from_date=args.from_date,
+                    to_date=args.to_date,
+                )
+            )
+        }
+    elif args.command == "sync-margin-interest":
+        result = {
+            "upserted": asyncio.run(
+                sync_margin_interest(
                     settings,
                     code=args.code,
                     date=args.date,
@@ -87,6 +100,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     fins_dividend = subparsers.add_parser("sync-fins-dividend")
     _add_jquants_range_args(fins_dividend)
+
+    margin_interest = subparsers.add_parser("sync-margin-interest")
+    _add_jquants_range_args(margin_interest)
 
     backfill_index = subparsers.add_parser("backfill-index-daily-bars")
     backfill_index.add_argument("--start-date", default="2008-05-07")
