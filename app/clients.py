@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from pathlib import Path
 from threading import Lock
 from time import monotonic, sleep
 from typing import Any
@@ -88,6 +89,27 @@ class JQuantsClient:
             source_api="/v2/equities/master",
         )
 
+    def fetch_market_segments(self) -> pd.DataFrame:
+        return self._with_metadata(
+            self._client.get_market_segments(),
+            source_api="official_client:get_market_segments",
+            sort_columns=["Mkt"],
+        )
+
+    def fetch_sector17(self) -> pd.DataFrame:
+        return self._with_metadata(
+            self._client.get_17_sectors(),
+            source_api="official_client:get_17_sectors",
+            sort_columns=["S17"],
+        )
+
+    def fetch_sector33(self) -> pd.DataFrame:
+        return self._with_metadata(
+            self._client.get_33_sectors(),
+            source_api="official_client:get_33_sectors",
+            sort_columns=["S33"],
+        )
+
     def fetch_equity_daily_bars(
         self,
         *,
@@ -112,11 +134,16 @@ class JQuantsClient:
     def fetch_market_calendar(
         self,
         *,
-        from_date: str,
-        to_date: str,
+        holiday_division: str | None = None,
+        from_date: str | None = None,
+        to_date: str | None = None,
     ) -> pd.DataFrame:
         return self._with_metadata(
-            self._client.get_mkt_calendar(from_yyyymmdd=from_date, to_yyyymmdd=to_date),
+            self._client.get_mkt_calendar(
+                holiday_division=holiday_division or "",
+                from_yyyymmdd=from_date or "",
+                to_yyyymmdd=to_date or "",
+            ),
             source_api="/v2/markets/calendar",
             sort_columns=["Date"],
         )
@@ -140,6 +167,94 @@ class JQuantsClient:
             ),
             source_api="/v2/markets/margin-interest",
             sort_columns=["Date", "Code"],
+        )
+
+    def fetch_market_breakdown(
+        self,
+        *,
+        code: str | None = None,
+        date: str | None = None,
+        from_date: str | None = None,
+        to_date: str | None = None,
+    ) -> pd.DataFrame:
+        if not code and not date:
+            raise ValueError("Either code or date is required for /v2/markets/breakdown")
+        return self._with_metadata(
+            self._client.get_mkt_breakdown(
+                code=code or "",
+                from_yyyymmdd=from_date or "",
+                to_yyyymmdd=to_date or "",
+                date_yyyymmdd=date or "",
+            ),
+            source_api="/v2/markets/breakdown",
+            sort_columns=["Date", "Code"],
+        )
+
+    def fetch_short_ratio(
+        self,
+        *,
+        s33: str | None = None,
+        date: str | None = None,
+        from_date: str | None = None,
+        to_date: str | None = None,
+    ) -> pd.DataFrame:
+        if not s33 and not date:
+            raise ValueError("Either s33 or date is required for /v2/markets/short-ratio")
+        return self._with_metadata(
+            self._client.get_mkt_short_ratio(
+                sector_33_code=s33 or "",
+                from_yyyymmdd=from_date or "",
+                to_yyyymmdd=to_date or "",
+                date_yyyymmdd=date or "",
+            ),
+            source_api="/v2/markets/short-ratio",
+            sort_columns=["Date", "S33"],
+        )
+
+    def fetch_margin_alert(
+        self,
+        *,
+        code: str | None = None,
+        date: str | None = None,
+        from_date: str | None = None,
+        to_date: str | None = None,
+    ) -> pd.DataFrame:
+        if not code and not date:
+            raise ValueError("Either code or date is required for /v2/markets/margin-alert")
+        return self._with_metadata(
+            self._client.get_mkt_margin_alert(
+                code=code or "",
+                from_yyyymmdd=from_date or "",
+                to_yyyymmdd=to_date or "",
+                date_yyyymmdd=date or "",
+            ),
+            source_api="/v2/markets/margin-alert",
+            sort_columns=["PubDate", "Code", "AppDate"],
+        )
+
+    def fetch_short_sale_report(
+        self,
+        *,
+        code: str | None = None,
+        disclosed_date: str | None = None,
+        disclosed_date_from: str | None = None,
+        disclosed_date_to: str | None = None,
+        calculated_date: str | None = None,
+    ) -> pd.DataFrame:
+        if not any([code, disclosed_date, disclosed_date_from, disclosed_date_to, calculated_date]):
+            raise ValueError(
+                "At least one of code, disclosed_date, disclosed_date_from, disclosed_date_to, or calculated_date is required for /v2/markets/short-sale-report"
+            )
+        return self._with_metadata(
+            self._client.get_mkt_short_sale_report(
+                code=code or "",
+                disclosed_date=disclosed_date or "",
+                disclosed_date_from=disclosed_date_from or "",
+                disclosed_date_to=disclosed_date_to or "",
+                calculated_date=calculated_date or "",
+            ),
+            source_api="/v2/markets/short-sale-report",
+            sort_columns=["DiscDate", "CalcDate", "Code"],
         )
 
     def fetch_topix_daily_bars(
@@ -168,15 +283,17 @@ class JQuantsClient:
         from_date: str | None = None,
         to_date: str | None = None,
     ) -> pd.DataFrame:
-        if not code and not date:
-            raise ValueError("Either code or date is required for /v2/indices/bars/daily")
+        if not any([code, date, from_date, to_date]):
+            raise ValueError("At least one of code, date, from_date, or to_date is required for /v2/indices/bars/daily")
+        dataframe = self._client.get_idx_bars_daily(
+            code=code or "",
+            from_yyyymmdd=from_date or "",
+            to_yyyymmdd=to_date or "",
+            date_yyyymmdd=date or "",
+        )
+
         return self._with_metadata(
-            self._client.get_idx_bars_daily(
-                code=code or "",
-                from_yyyymmdd=from_date or "",
-                to_yyyymmdd=to_date or "",
-                date_yyyymmdd=date or "",
-            ),
+            dataframe,
             source_api="/v2/indices/bars/daily",
             sort_columns=["Date", "Code"],
         )
@@ -240,6 +357,19 @@ class JQuantsClient:
             source_api="/v2/fins/dividend",
             sort_columns=["PubDate", "Code", "RefNo"],
         )
+
+    def fetch_bulk_file_list(self, *, endpoint: str) -> pd.DataFrame:
+        return self._with_metadata(
+            self._client.get_bulk_list(endpoint),
+            source_api="/v2/bulk/list",
+            sort_columns=["Key"],
+        )
+
+    def download_bulk_file(self, *, key: str, output_path: str) -> Path:
+        output = Path(output_path)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        self._client.download_bulk(key, str(output))
+        return output
 
     def _fetch_code_scoped_date_range(
         self,

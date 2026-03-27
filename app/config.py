@@ -20,3 +20,7 @@ class Settings(BaseSettings):
     dataset_b_path: str = "/dataset-b"
     jquants_api_key: str = ""
     jquants_rate_limit_per_minute: int = Field(default=500, gt=0)
+    jquants_bulk_download_dir: str = "var/jquants_bulk"
+    openai_api_key: str = ""
+    gemini_api_key: str = ""
+    xai_api_key: str = ""

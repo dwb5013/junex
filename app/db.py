@@ -14,7 +14,7 @@ class DuckDBRepository:
         self.database_path = database_path
 
     def replace_table(self, table_name: str, dataframe: pd.DataFrame) -> int:
-        if dataframe.empty:
+        if dataframe.empty and len(dataframe.columns) == 0:
             return 0
 
         with self._connect() as connection:
@@ -66,6 +66,10 @@ class DuckDBRepository:
     def query(self, sql: str) -> pd.DataFrame:
         with self._connect() as connection:
             return connection.execute(sql).df()
+
+    def execute(self, sql: str) -> None:
+        with self._connect() as connection:
+            connection.execute(sql)
 
     def _connect(self) -> duckdb.DuckDBPyConnection:
         database_file = Path(self.database_path)

@@ -7,3 +7,5 @@ __pycache__/
 .codex/
 .uv-cache/
 junex.egg-info/
+var/
+45920_*.json
